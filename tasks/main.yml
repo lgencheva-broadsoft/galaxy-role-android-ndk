@@ -5,3 +5,6 @@
 
 - include: ndktools.yml
   when: ansible_os_family == "Debian" 
+
+- include: ndktools-Darwin.yml
+  when: ansible_os_family == "Darwin" 

@@ -1,0 +1,60 @@
+---
+- name: See if we already have the NDK
+  # Check for a file that's created at the end of successful install
+  stat: path="{{android_ndk_install_location}}/android-ndk-r{{android_ndk_version}}"
+  register: ndk_installed_PATH
+
+- debug: var=ndk_installed_PATH
+
+- name: Ensure Android NDK tools directory exists
+  become: yes
+  file: path={{ android_ndk_install_location }} state=directory owner={{ remote_user }}
+
+- name: Download Android NDK tools, x86_64
+  get_url: 
+    url="http://dl.google.com/android/repository/android-ndk-r{{ android_ndk_version }}-darwin-x86_64.zip" 
+    dest="{{ android_ndk_install_location }}/ndk-{{android_ndk_version}}.zip"
+  when: ansible_userspace_bits == "64" and 
+        ndk_installed_PATH.stat.exists == False
+
+- name: Download Android NDK tools, x86
+  get_url: 
+    url="http://dl.google.com/android/repository/android-ndk-r{{ android_ndk_version }}-darwin-x86.zip" 
+    dest="{{ android_ndk_install_location }}/ndk-{{android_ndk_version}}.zip"
+  when: ansible_userspace_bits == "32" and 
+        ndk_installed_PATH.stat.exists == False
+
+- name: Unarchive the NDK
+  unarchive: 
+    src: "{{ android_ndk_install_location }}/ndk-{{ android_ndk_version }}.zip"
+    dest: "{{ android_ndk_install_location }}"
+    # Test whether installation has succeeded before on this host
+    remote_src: True
+    creates: "{{android_ndk_install_location}}/android-ndk-r{{android_ndk_version}}"
+  when: ndk_installed_PATH.stat.exists == False
+
+- name: Remove alias
+  file: path="{{ android_ndk_install_location }}/android-ndk-darwin" state="absent"
+
+- name: Create alias for NDK
+  file: src="{{ android_ndk_install_location }}/android-ndk-r{{ android_ndk_version }}" dest="{{ android_ndk_install_location }}/android-ndk-darwin" state=link force=yes
+
+- name: Remove downloaded file
+  file: path="{{ android_ndk_install_location }}/ndk-r{{android_ndk_version}}.zip" state=absent
+
+- name: Set ANDROID_NDK_HOME
+  become: yes
+  lineinfile:
+    dest: /etc/profile
+    create: no
+    state: present
+    line: 'export ANDROID_NDK_HOME="{{ android_ndk_install_location }}/android-ndk-darwin"'
+
+- name: Add NDK executables to PATH
+  become: yes
+  lineinfile:
+    dest: /etc/profile
+    create: no
+    state: present
+    line: 'export PATH="$PATH:{{ android_ndk_install_location }}/android-ndk-darwin"'
+
